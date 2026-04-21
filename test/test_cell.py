@@ -48,9 +48,6 @@ try:
 except ValueError:
     pass
 
-# ------------------------------------------------------------------
-# 6. fix(10) raises ValueError
-# ------------------------------------------------------------------
 try:
     c4.fix(10)
     assert False, "fix(10) should have raised ValueError"
