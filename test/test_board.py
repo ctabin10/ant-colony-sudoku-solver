@@ -120,4 +120,23 @@ try:
 except ValueError:
     pass
 
-print("All 10 test cases passed.")
+# ------------------------------------------------------------------
+# 11. is_solved() and is_valid_solution() return True for a solved board
+# ------------------------------------------------------------------
+import sys as _sys
+_sys.path.insert(0, _sys.path[0])  # already inserted at top
+from sudoku.propagator import ConstraintPropagator as _CP
+
+solved_board = Board.from_string(PUZZLE)
+_CP.initialize(solved_board)
+assert solved_board.is_solved(),            "initialized easy puzzle must be solved"
+assert solved_board.is_valid_solution(),    "initialized easy puzzle must be a valid solution"
+
+# ------------------------------------------------------------------
+# 12. is_solved() returns False for an un-initialized board
+# ------------------------------------------------------------------
+blank = Board.from_string("." * 81)
+assert not blank.is_solved(),           "blank board must not be solved"
+assert not blank.is_valid_solution(),   "blank board must not be a valid solution"
+
+print("All 12 test cases passed.")

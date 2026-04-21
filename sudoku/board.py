@@ -109,6 +109,22 @@ class Board:
         return cls(cells=cells, rows=rows, cols=cols, boxes=boxes)
 
     # ------------------------------------------------------------------
+    # Solution checks
+    # ------------------------------------------------------------------
+
+    def is_valid_solution(self) -> bool:
+        """Return True when every row, column, and box contains exactly the digits 1-9."""
+        required = set(range(1, 10))
+        for unit in self.rows + self.cols + self.boxes:
+            if {self.cells[i].value for i in unit} != required:
+                return False
+        return True
+
+    def is_solved(self) -> bool:
+        """Return True when all domains are singletons and the solution is valid."""
+        return all(c.is_fixed for c in self.cells) and self.is_valid_solution()
+
+    # ------------------------------------------------------------------
     # Display
     # ------------------------------------------------------------------
 
