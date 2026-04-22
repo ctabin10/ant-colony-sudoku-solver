@@ -2,17 +2,13 @@
 
 from aco.solver import SudokuACOSolver
 
-PUZZLE = (
-    "53..7...."
-    "6..195..."
-    ".98....6."
-    "8...6...3"
-    "4..8.3..1"
-    "7...2...6"
-    ".6....28."
-    "...419..5"
-    "....8..79"
-)
+from generator import generate_puzzle
+PUZZLE = generate_puzzle("medium")
+
+#print raw puzzle
+print("Generated puzzle:")
+for i in range(0, 81, 9):
+    print(PUZZLE[i:i+9])
 
 solver = SudokuACOSolver()
 board = solver.solve(PUZZLE)
