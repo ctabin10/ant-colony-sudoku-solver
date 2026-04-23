@@ -1,0 +1,3 @@
+bucket,puzzle,solved,valid_solution,solve_time_seconds,history_length,final_num_fixed,propagation_only,error
+easy,.................................................................................,True,True,1.0,5,81,False,
+hard,.................................................................................,True,True,1.0,5,81,False,
