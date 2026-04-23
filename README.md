@@ -288,6 +288,49 @@ The baseline experiment was run with a deliberately minimal ACO configuration to
 
 ---
 
+### Increased ACO Experiment
+
+To test that prediction, the experiment was re-run with a stronger ACO configuration: 5 ants and 20 iterations instead of 1 and 10. Screenshot saved at `evaluation/results/result2.png`.
+
+#### Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| NUM\_RUNS | 10 |
+| NUM\_PER\_BUCKET | 100 |
+| NUM\_ANTS | 5 |
+| MAX\_ITERATIONS | 20 |
+| Total puzzle attempts | 4,000 |
+
+#### Results
+
+| Bucket | Avg Solved Rate | Avg Mean Time (s) | Avg Prop-only |
+|--------|----------------|-------------------|---------------|
+| easy | 100.0% | 0.0026 | 100.0 |
+| medium | 100.0% | 0.0027 | 99.1 |
+| hard | 100.0% | 0.0065 | 84.6 |
+| expert | 100.0% | 0.0158 | 58.7 |
+| **overall** | **100.0%** | **0.0069** | **85.6** |
+
+#### Comparison
+
+| Setting | Ants | Iterations | Overall Solved | Expert Solved | Avg Mean Time |
+|---------|------|------------|----------------|---------------|---------------|
+| Baseline ACO | 1 | 10 | 98.5% | 94.7% | 0.0047s |
+| Increased ACO | 5 | 20 | 100.0% | 100.0% | 0.0069s |
+
+#### Discussion
+
+**Scaling ACO eliminated all remaining failures.** Raising from 1 ant / 10 iterations to 5 ants / 20 iterations closed the 5.3% expert gap completely, lifting the overall solve rate from 98.5% to 100%. This is the direct result predicted by the baseline: the unsolved cases were not contradictions or malformed puzzles — they were simply puzzles where the search budget ran out before a solution was found.
+
+**The runtime cost is modest.** Mean solve time increased from 0.0047s to 0.0069s overall — a 47% increase in compute for a 5.3 percentage-point improvement in accuracy. At expert difficulty the mean time rose from 0.0098s to 0.0158s, still well under 20ms per puzzle. For a research context this trade-off is clearly worth it.
+
+**Propagation-only counts remained essentially unchanged.** The proportion of puzzles solved by constraint propagation alone stayed flat across both experiments (85.4 vs 85.6 overall, 56.6 vs 58.7 at expert). This confirms that increasing ACO resources does not affect the propagation layer at all — it only improves the outcomes of puzzles that propagation could not finish. The two components operate independently, which validates the hybrid design.
+
+**The hybrid design holds.** Propagation reduces the puzzle; ACO completes the cases propagation cannot. With a reasonable ACO budget the solver reaches 100% across all difficulty levels while keeping solve times in the single-digit millisecond range. Future experiments should explore whether further scaling (more ants, more iterations) yields diminishing returns, or whether it can maintain 100% on even harder puzzle distributions.
+
+---
+
 ## 10. Notes
 
 - **Easy puzzles** (those solvable by logical deduction alone) are solved entirely by `ConstraintPropagator.initialize()`. The ACO loop is never entered and `history` stays empty.

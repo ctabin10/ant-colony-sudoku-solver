@@ -19,8 +19,8 @@ from evaluation.metrics import summarize_results
 
 NUM_RUNS = 10
 NUM_PER_BUCKET = 100
-NUM_ANTS = 1
-MAX_ITERATIONS = 10
+NUM_ANTS = 5
+MAX_ITERATIONS = 20
 
 BASELINE_CSV_PATH = "evaluation/results/baseline_results.csv"
 
