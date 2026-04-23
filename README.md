@@ -160,18 +160,29 @@ ant-colony-sudoku-solver/
 │
 ├── sudoku/
 │   ├── __init__.py
-│   ├── cell.py          # Cell dataclass — one grid variable
-│   ├── board.py         # Board dataclass — structure and validation
-│   └── propagator.py    # Constraint propagation (assign / eliminate)
+│   ├── cell.py               # Cell dataclass — one grid variable
+│   ├── board.py              # Board dataclass — structure and validation
+│   └── propagator.py         # Constraint propagation (assign / eliminate)
 │
 ├── aco/
 │   ├── __init__.py
-│   ├── pheromone.py     # Pheromone matrix and local update rule
-│   ├── chooser.py       # Greedy / roulette digit selection
-│   ├── ant.py           # Ant state
-│   ├── ant_solver.py    # Ant stepping logic
-│   ├── colony.py        # Colony iteration and pheromone memory
-│   └── solver.py        # Top-level orchestrator
+│   ├── pheromone.py          # Pheromone matrix and local update rule
+│   ├── chooser.py            # Greedy / roulette digit selection
+│   ├── ant.py                # Ant state
+│   ├── ant_solver.py         # Ant stepping logic
+│   ├── colony.py             # Colony iteration and pheromone memory
+│   └── solver.py             # Top-level orchestrator
+│
+├── evaluation/
+│   ├── __init__.py
+│   ├── puzzle_source.py      # Puzzle generation grouped by difficulty bucket
+│   ├── metrics.py            # BenchmarkResult dataclass and summarize_results()
+│   ├── benchmark.py          # Single-run benchmark: solve, time, and save CSVs
+│   ├── experiment_runner.py  # Multi-run baseline experiment with averaged summaries
+│   └── results/
+│       ├── raw_results.csv
+│       ├── summary.csv
+│       └── baseline_results.csv
 │
 ├── test/
 │   ├── test_cell.py
@@ -181,18 +192,49 @@ ant-colony-sudoku-solver/
 │   ├── test_chooser.py
 │   ├── test_ant.py
 │   ├── test_colony.py
-│   └── test_solver.py
+│   ├── test_solver.py
+│   ├── test_puzzle_source.py
+│   ├── test_metrics.py
+│   └── test_benchmark.py
 │
+├── generator.py
 └── main.py
 ```
 
 ---
 
-## 7. Testing
+## 7. Evaluation Pipeline
+
+The `evaluation/` package provides a layered pipeline for measuring solver performance at scale.
+
+**`puzzle_source.py`** — generates puzzles using the `dokusan` library, grouped into four difficulty buckets. Each bucket label maps to a numeric `avg_rank` that controls how constrained the generated puzzle is:
+
+| Label | avg\_rank | Typical empty cells |
+|--------|-----------|---------------------|
+| easy | 30 | ~32 |
+| medium | 50 | ~40 |
+| hard | 100 | ~53 |
+| expert | 200 | ~55 |
+
+**`metrics.py`** — defines `BenchmarkResult`, a dataclass that records one puzzle run (solved status, time, history length, propagation-only flag, and error). `summarize_results()` aggregates a list of results into per-bucket statistics.
+
+**`benchmark.py`** — runs one full benchmark: generates puzzles, solves each one, and writes raw and summary CSVs. Run it directly:
+
+```bash
+python evaluation/benchmark.py
+```
+
+**`experiment_runner.py`** — repeats the benchmark a configurable number of times and averages the results across runs. This is the main tool for producing stable performance estimates:
+
+```bash
+python evaluation/experiment_runner.py
+```
+
+---
+
+## 8. Testing
 
 All tests use plain Python assertions and can be run directly without any test framework.
-
-Run an individual test file:
 
 ```bash
 python test/test_cell.py
@@ -203,11 +245,50 @@ python test/test_chooser.py
 python test/test_ant.py
 python test/test_colony.py
 python test/test_solver.py
+python test/test_puzzle_source.py
+python test/test_metrics.py
+python test/test_benchmark.py
 ```
 
 ---
 
-## 8. Notes
+## 9. Baseline Experiment Results
+
+The baseline experiment was run with a deliberately minimal ACO configuration to establish a lower bound on solver performance and to measure how much work constraint propagation alone can handle.
+
+### Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| NUM\_RUNS | 10 |
+| NUM\_PER\_BUCKET | 100 |
+| NUM\_ANTS | 1 |
+| MAX\_ITERATIONS | 10 |
+| Total puzzle attempts | 4,000 |
+
+### Results
+
+| Bucket | Avg Solved Rate | Avg Mean Time (s) | Avg Prop-only |
+|--------|----------------|-------------------|---------------|
+| easy | 100.0% | 0.0023 | 100.0 |
+| medium | 100.0% | 0.0024 | 99.4 |
+| hard | 99.2% | 0.0044 | 85.5 |
+| expert | 94.7% | 0.0098 | 56.6 |
+| **overall** | **98.5%** | **0.0047** | **85.4** |
+
+### Discussion
+
+**Propagation carries almost all the load.** Across all 4,000 puzzle attempts, constraint propagation alone solved 85.4% of puzzles on average before the ACO loop was even entered. Every single easy puzzle and essentially all medium puzzles (99.4 out of 100 per run) were resolved by `ConstraintPropagator.initialize()` without any search. This confirms that the CSP structure of Sudoku is dense enough that logical deduction is the dominant solver — ACO is the exception, not the rule.
+
+**Performance degrades gracefully with difficulty.** The solve rate drops from 100% at easy and medium to 99.2% at hard and 94.7% at expert. The mean solve time increases from ~2 ms at easy to ~10 ms at expert. This gradient is exactly what we should expect: harder puzzles leave more cells unresolved after propagation, giving ACO more ground to cover within its 10-iteration budget.
+
+**The ACO configuration is intentionally weak.** Using only 1 ant and 10 iterations is far below any production setting — this run was designed to stress the propagation layer, not the search layer. The fact that the solver still achieves 94.7% on expert puzzles under these constraints is encouraging. It suggests the pheromone and propagation integration is working correctly, and that scaling up ants and iterations should yield meaningful improvement on the unsolved cases.
+
+**The 5.3% expert failure rate is the primary target for future tuning.** All failures at expert occur because the 10-iteration budget runs out before a full solution is found. The returned board in those cases is a partial result (the best seen during the run), not a contradiction. Increasing `MAX_ITERATIONS` or `NUM_ANTS` is the most direct lever for closing this gap.
+
+---
+
+## 10. Notes
 
 - **Easy puzzles** (those solvable by logical deduction alone) are solved entirely by `ConstraintPropagator.initialize()`. The ACO loop is never entered and `history` stays empty.
 - **Harder puzzles** require the ACO search. The solver returns the best board found within `max_iterations`; if no complete solution is found, the most-complete partial board is returned.
