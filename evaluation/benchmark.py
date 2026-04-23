@@ -34,10 +34,15 @@ SUMMARY_RESULTS_PATH = "evaluation/results/summary.csv"
 # Core functions
 # ---------------------------------------------------------------------------
 
-def run_single_puzzle(bucket: str, puzzle: str) -> BenchmarkResult:
+def run_single_puzzle(
+    bucket: str,
+    puzzle: str,
+    num_ants: int = NUM_ANTS,
+    max_iterations: int = MAX_ITERATIONS,
+) -> BenchmarkResult:
     solver = SudokuACOSolver(
-        num_ants=NUM_ANTS,
-        max_iterations=MAX_ITERATIONS,
+        num_ants=num_ants,
+        max_iterations=max_iterations,
         q0=Q0,
         xi=XI,
         rho=RHO,
@@ -97,12 +102,16 @@ def save_summary(results: list[BenchmarkResult], path: str) -> None:
         writer.writerows(rows)
 
 
-def run_benchmark(num_per_bucket: int = NUM_PER_BUCKET) -> list[BenchmarkResult]:
+def run_benchmark(
+    num_per_bucket: int = NUM_PER_BUCKET,
+    num_ants: int = NUM_ANTS,
+    max_iterations: int = MAX_ITERATIONS,
+) -> list[BenchmarkResult]:
     buckets = generate_puzzle_buckets(num_per_bucket)
     results: list[BenchmarkResult] = []
     for bucket, puzzles in buckets.items():
         for puzzle in puzzles:
-            results.append(run_single_puzzle(bucket, puzzle))
+            results.append(run_single_puzzle(bucket, puzzle, num_ants, max_iterations))
     return results
 
 

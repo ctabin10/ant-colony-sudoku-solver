@@ -104,7 +104,7 @@ _orig_gpb = bm.generate_puzzle_buckets
 _orig_rsp = bm.run_single_puzzle
 
 bm.generate_puzzle_buckets = lambda n: _fake_buckets
-bm.run_single_puzzle = lambda bucket, puzzle: _make_result(bucket=bucket, puzzle=puzzle)
+bm.run_single_puzzle = lambda bucket, puzzle, *args, **kwargs: _make_result(bucket=bucket, puzzle=puzzle)
 
 bench_results = bm.run_benchmark(num_per_bucket=2)
 
