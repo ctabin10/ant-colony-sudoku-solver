@@ -252,11 +252,11 @@ python test/test_benchmark.py
 
 ---
 
-## 9. Baseline Experiment Results
+## 9. Evaluation Results
 
-The baseline experiment was run with a deliberately minimal ACO configuration to establish a lower bound on solver performance and to measure how much work constraint propagation alone can handle.
+Two experiments were run to characterise solver performance across difficulty levels and to test the effect of increasing ACO resources. Each experiment used 10 runs of 100 puzzles per bucket (4,000 puzzle attempts total). Screenshots are saved at `evaluation/results/baseline-result.png` and `evaluation/results/result2.png`.
 
-### Configuration
+### Experiment 1 — Baseline ACO
 
 | Parameter | Value |
 |-----------|-------|
@@ -266,8 +266,6 @@ The baseline experiment was run with a deliberately minimal ACO configuration to
 | MAX\_ITERATIONS | 10 |
 | Total puzzle attempts | 4,000 |
 
-### Results
-
 | Bucket | Avg Solved Rate | Avg Mean Time (s) | Avg Prop-only |
 |--------|----------------|-------------------|---------------|
 | easy | 100.0% | 0.0023 | 100.0 |
@@ -276,23 +274,7 @@ The baseline experiment was run with a deliberately minimal ACO configuration to
 | expert | 94.7% | 0.0098 | 56.6 |
 | **overall** | **98.5%** | **0.0047** | **85.4** |
 
-### Discussion
-
-**Propagation carries almost all the load.** Across all 4,000 puzzle attempts, constraint propagation alone solved 85.4% of puzzles on average before the ACO loop was even entered. Every single easy puzzle and essentially all medium puzzles (99.4 out of 100 per run) were resolved by `ConstraintPropagator.initialize()` without any search. This confirms that the CSP structure of Sudoku is dense enough that logical deduction is the dominant solver — ACO is the exception, not the rule.
-
-**Performance degrades gracefully with difficulty.** The solve rate drops from 100% at easy and medium to 99.2% at hard and 94.7% at expert. The mean solve time increases from ~2 ms at easy to ~10 ms at expert. This gradient is exactly what we should expect: harder puzzles leave more cells unresolved after propagation, giving ACO more ground to cover within its 10-iteration budget.
-
-**The ACO configuration is intentionally weak.** Using only 1 ant and 10 iterations is far below any production setting — this run was designed to stress the propagation layer, not the search layer. The fact that the solver still achieves 94.7% on expert puzzles under these constraints is encouraging. It suggests the pheromone and propagation integration is working correctly, and that scaling up ants and iterations should yield meaningful improvement on the unsolved cases.
-
-**The 5.3% expert failure rate is the primary target for future tuning.** All failures at expert occur because the 10-iteration budget runs out before a full solution is found. The returned board in those cases is a partial result (the best seen during the run), not a contradiction. Increasing `MAX_ITERATIONS` or `NUM_ANTS` is the most direct lever for closing this gap.
-
----
-
-### Increased ACO Experiment
-
-To test that prediction, the experiment was re-run with a stronger ACO configuration: 5 ants and 20 iterations instead of 1 and 10. Screenshot saved at `evaluation/results/result2.png`.
-
-#### Configuration
+### Experiment 2 — Increased ACO
 
 | Parameter | Value |
 |-----------|-------|
@@ -302,8 +284,6 @@ To test that prediction, the experiment was re-run with a stronger ACO configura
 | MAX\_ITERATIONS | 20 |
 | Total puzzle attempts | 4,000 |
 
-#### Results
-
 | Bucket | Avg Solved Rate | Avg Mean Time (s) | Avg Prop-only |
 |--------|----------------|-------------------|---------------|
 | easy | 100.0% | 0.0026 | 100.0 |
@@ -312,22 +292,26 @@ To test that prediction, the experiment was re-run with a stronger ACO configura
 | expert | 100.0% | 0.0158 | 58.7 |
 | **overall** | **100.0%** | **0.0069** | **85.6** |
 
-#### Comparison
+### Comparison
 
 | Setting | Ants | Iterations | Overall Solved | Expert Solved | Avg Mean Time |
 |---------|------|------------|----------------|---------------|---------------|
 | Baseline ACO | 1 | 10 | 98.5% | 94.7% | 0.0047s |
 | Increased ACO | 5 | 20 | 100.0% | 100.0% | 0.0069s |
 
-#### Discussion
+### Evaluation Discussion
 
-**Scaling ACO eliminated all remaining failures.** Raising from 1 ant / 10 iterations to 5 ants / 20 iterations closed the 5.3% expert gap completely, lifting the overall solve rate from 98.5% to 100%. This is the direct result predicted by the baseline: the unsolved cases were not contradictions or malformed puzzles — they were simply puzzles where the search budget ran out before a solution was found.
+**Constraint propagation handles the vast majority of puzzles before ACO is needed.** Across both experiments, roughly 85% of all puzzles were resolved entirely by `ConstraintPropagator.initialize()` with no search. Every easy puzzle and nearly all medium puzzles were solved this way. This confirms that Sudoku's constraint structure is dense enough for logical deduction to dominate — ACO is required only for the subset of puzzles that propagation cannot finish.
 
-**The runtime cost is modest.** Mean solve time increased from 0.0047s to 0.0069s overall — a 47% increase in compute for a 5.3 percentage-point improvement in accuracy. At expert difficulty the mean time rose from 0.0098s to 0.0158s, still well under 20ms per puzzle. For a research context this trade-off is clearly worth it.
+**The baseline ACO configuration established a meaningful lower bound.** With just 1 ant and 10 iterations, the solver reached 98.5% overall and 94.7% at expert difficulty. Failures at expert were not contradictions — they were cases where the search budget expired before a complete solution was found, leaving the best partial board as the output. This result shows that the pheromone and propagation integration is functionally correct even under minimal resources.
 
-**Propagation-only counts remained essentially unchanged.** The proportion of puzzles solved by constraint propagation alone stayed flat across both experiments (85.4 vs 85.6 overall, 56.6 vs 58.7 at expert). This confirms that increasing ACO resources does not affect the propagation layer at all — it only improves the outcomes of puzzles that propagation could not finish. The two components operate independently, which validates the hybrid design.
+**Increasing ACO resources closed the accuracy gap entirely.** Raising to 5 ants and 20 iterations lifted the overall solve rate from 98.5% to 100% and eliminated all expert failures, improving that bucket from 94.7% to 100%. The additional resources gave the colony enough iterations to find solutions for the puzzles that the baseline budget could not reach.
 
-**The hybrid design holds.** Propagation reduces the puzzle; ACO completes the cases propagation cannot. With a reasonable ACO budget the solver reaches 100% across all difficulty levels while keeping solve times in the single-digit millisecond range. Future experiments should explore whether further scaling (more ants, more iterations) yields diminishing returns, or whether it can maintain 100% on even harder puzzle distributions.
+**The runtime cost is modest.** Mean solve time increased from 0.0047s to 0.0069s — a 47% increase in compute for a 5.3 percentage-point gain in accuracy, with expert times rising from 0.0098s to 0.0158s. All solve times remain well under 20ms per puzzle, making the stronger configuration practical.
+
+**Propagation-only counts were unaffected by the change in ACO settings.** The proportion of puzzles solved by propagation alone stayed virtually flat between experiments (85.4 vs 85.6 overall; 56.6 vs 58.7 at expert). This is the key architectural finding: the two components are independent. Stronger ACO does not change how propagation behaves — it only improves outcomes for the cases propagation leaves unresolved.
+
+**The hybrid design is validated.** Propagation reduces the search space; ACO completes the harder remaining cases. Together they achieve 100% accuracy across all difficulty levels at under 20ms per puzzle, with a clear and predictable lever — ACO budget — for trading compute against accuracy.
 
 ---
 
